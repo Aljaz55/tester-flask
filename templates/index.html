@@ -3,221 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iskalnik z govornim vnosom</title>
+    <title>Govorno iskanje</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f5f5f5;
-        }
-        .search-container {
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            border: 2px solid #ccc;
-            border-radius: 5px;
-            background-color: #fff;
-            width: 400px;
-        }
-        .search-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        input[type="text"] {
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            outline: none;
-            flex-grow: 1;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            margin-left: 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #micButton.listening {
-            background-color: #ff6347;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        .status-text {
-            font-size: 14px;
-            color: #555;
-            text-align: center;
-            margin-top: 10px;
-            min-height: 20px;
-        }
-        .stop-button {
-            background-color: #ff6347;
-            display: none;
-            margin-left: 10px;
-        }
-        .stop-button:hover {
-            background-color: #e5533d;
-        }
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .search-box { display: flex; padding: 10px; border: 1px solid #ccc; border-radius: 5px; width: 400px; }
+        input { flex-grow: 1; padding: 8px; border: none; outline: none; }
+        button { background: #4CAF50; color: white; border: none; padding: 8px 12px; margin-left: 5px; border-radius: 3px; cursor: pointer; }
+        #micButton.listening { background: #ff6347; }
     </style>
 </head>
 <body>
-
-    <div class="search-container">
-        <div class="search-row">
-            <form id="searchForm" action="/search" method="GET" style="display: flex; width: 100%;">
-                <input type="text" id="searchInput" name="query" placeholder="Išči..." required />
-                <button id="micButton" type="button">🎤</button>
-                <button id="stopButton" class="stop-button" type="button">■</button>
-                <button type="submit">Išči</button>
-            </form>
-        </div>
-        <div class="status-text" id="statusText">Kliknite mikrofon za začetek govora</div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Išči...">
+        <button id="micButton">🎤</button>
+        <button id="searchButton">Išči</button>
     </div>
 
     <script>
         const micButton = document.getElementById('micButton');
-        const stopButton = document.getElementById('stopButton');
         const searchInput = document.getElementById('searchInput');
-        const statusText = document.getElementById('statusText');
-        const searchForm = document.getElementById('searchForm');
-
-        let recognition;
-        let isListening = false;
-        let silenceTimer;
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.lang = 'sl-SI';
-            recognition.interimResults = true;
-            recognition.continuous = false; // Important for auto-stopping
-            
-            // Configure recognition settings
-            recognition.maxAlternatives = 1;
-        }
-
-        // When the mic button is clicked
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'sl-SI';
+        recognition.interimResults = false;
+        
         micButton.addEventListener('click', () => {
-            if (!recognition) {
-                statusText.textContent = "Brskalnik ne podpira govornega prepoznavanja. Prosimo, posodobite brskalnik.";
-                return;
-            }
-            
-            if (isListening) {
-                stopRecognition();
-                return;
-            }
-            
-            startRecognition();
-        });
-
-        // Stop button handler
-        stopButton.addEventListener('click', stopRecognition);
-
-        function startRecognition() {
-            try {
-                recognition.start();
-                isListening = true;
-                micButton.classList.add('listening');
-                stopButton.style.display = 'block';
-                statusText.textContent = "Poslušam... govorite zdaj";
-                
-                // Set a timeout to stop listening after 8 seconds if no speech is detected
-                clearTimeout(silenceTimer);
-                silenceTimer = setTimeout(() => {
-                    if (isListening) {
-                        statusText.textContent = "Avtomatsko ustavljanje zaradi neaktivnosti";
-                        stopRecognition();
-                    }
-                }, 8000);
-                
-            } catch (e) {
-                statusText.textContent = "Napaka: " + e.message;
-                console.error("Recognition error:", e);
-            }
-        }
-
-        function stopRecognition() {
-            if (recognition && isListening) {
+            if (micButton.classList.contains('listening')) {
                 recognition.stop();
-                isListening = false;
-                clearTimeout(silenceTimer);
                 micButton.classList.remove('listening');
-                stopButton.style.display = 'none';
-                statusText.textContent = "Končano s poslušanjem";
-            }
-        }
-
-        // When speech is recognized
-        recognition.onresult = (event) => {
-            clearTimeout(silenceTimer); // Reset the silence timer when speech is detected
-            
-            const transcript = event.results[0][0].transcript;
-            searchInput.value = transcript;
-            
-            // Auto-stop after a short delay when speech ends
-            silenceTimer = setTimeout(() => {
-                if (isListening) {
-                    stopRecognition();
-                }
-            }, 1500); // 1.5 seconds after last speech
-        };
-
-        // When speech recognition ends
-        recognition.onend = () => {
-            if (isListening) {
-                // Sometimes onend fires unexpectedly - we'll let our timer handle this
-                console.log("Recognition ended naturally");
-            }
-        };
-
-        // Error handling
-        recognition.onerror = (event) => {
-            isListening = false;
-            micButton.classList.remove('listening');
-            stopButton.style.display = 'none';
-            
-            let errorMessage;
-            switch(event.error) {
-                case 'no-speech':
-                    errorMessage = "Ni bilo zaznanega govora. Poskusite znova.";
-                    break;
-                case 'audio-capture':
-                    errorMessage = "Napaka pri zajemu zvoka. Preverite mikrofon.";
-                    break;
-                case 'not-allowed':
-                    errorMessage = "Dostop do mikrofona je zavrnjen. Omogočite dostop v nastavitvah brskalnika.";
-                    break;
-                default:
-                    errorMessage = "Napaka pri prepoznavanju govora: " + event.error;
+                return;
             }
             
-            statusText.textContent = errorMessage;
-            console.error("Recognition error:", event.error);
-        };
-
-        // Prevent form submission when pressing enter to avoid interrupting speech
-        searchForm.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && isListening) {
-                e.preventDefault();
-            }
+            recognition.start();
+            micButton.classList.add('listening');
         });
-    </script>
 
+        recognition.onresult = (e) => {
+            searchInput.value = e.results[0][0].transcript;
+            micButton.classList.remove('listening');
+        };
+
+        recognition.onerror = (e) => {
+            micButton.classList.remove('listening');
+            console.error(e.error);
+        };
+    </script>
 </body>
 </html>
